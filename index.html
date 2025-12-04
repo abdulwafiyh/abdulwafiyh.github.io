@@ -662,7 +662,7 @@
 
                     <div class="form-group">
                         <label for="port-desc">Deskripsi</label>
-                        <textarea id="port-desc" class="form-input" rows="3" maxlength="1000"></textarea>
+                        <textarea id="port-desc" class="form-input" rows="3" maxlength="5000"></textarea>
                     </div>
                     
                     <div style="display:flex; gap:10px;">
@@ -749,395 +749,396 @@
     <button onclick="topFunction()" id="scrollTopBtn" title="Ke Atas" aria-label="Scroll ke Atas"><i class="fas fa-arrow-up"></i></button>
     <div id="toast">Notifikasi</div>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js" defer></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js" defer></script> 
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script> 
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
     <script>
-        // Menunggu semua library termuat
         document.addEventListener("DOMContentLoaded", function() {
-            // --- CONFIGURATION ---
+            // --- 1. KONFIGURASI FIREBASE ---
             const firebaseConfig = {
-            apiKey: "AIzaSyCuznYseL1ysiE-fNXMbCgsMTSm0ADEQfY",
-            authDomain: "abdulwafiyhdotme.firebaseapp.com",
-            projectId: "abdulwafiyhdotme",
-            storageBucket: "abdulwafiyhdotme.firebasestorage.app",
-            messagingSenderId: "962154293870",
-            appId: "1:962154293870:web:b143d742a6fbca0a73547f",
-            measurementId: "G-43V8TTEHJW"
+                apiKey: "AIzaSyCuznYseL1ysiE-fNXMbCgsMTSm0ADEQfY",
+                authDomain: "abdulwafiyhdotme.firebaseapp.com",
+                // WAJIB ISI INI AGAR TIDAK STUCK:
+                databaseURL: "https://abdulwafiyhdotme-default-rtdb.asia-southeast1.firebasedatabase.app", 
+                projectId: "abdulwafiyhdotme",
+                storageBucket: "abdulwafiyhdotme.firebasestorage.app",
+                messagingSenderId: "962154293870",
+                appId: "1:962154293870:web:b143d742a6fbca0a73547f",
+                measurementId: "G-43V8TTEHJW"
             };
 
-            // Initialize Firebase Safely (Using interval check if defer delays it)
-            const initFirebase = setInterval(() => {
-                if (typeof firebase !== 'undefined') {
-                    clearInterval(initFirebase);
-                    try {
-                        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-                        startApp(); // Start main logic
-                    } catch (e) { console.error("Firebase Init Error:", e); }
-                }
-            }, 100);
+            // Inisialisasi Firebase
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            } else {
+                firebase.app(); 
+            }
 
-            function startApp() {
-                const db = firebase.database();
-                const auth = firebase.auth();
-                
-                let currentUser = null;
-                let cropper = null;
-                let currentEditKey = null;
-                let deleteTarget = { key: null, type: null };
+            const db = firebase.database();
+            const auth = firebase.auth();
+            
+            // Variabel Global
+            let currentUser = null;
+            let cropper = null;
+            let currentEditKey = null;
+            let deleteTarget = { key: null, type: null };
+            let portfolioData = {};
 
-                // --- UTILITIES ---
-                const escapeHtml = (text) => {
-                    if (!text) return "";
-                    return text.toString().replace(/[&<>"']/g, function(m) {
-                        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
-                    });
-                };
-
-                window.showToast = (msg) => {
-                    const t = document.getElementById("toast");
-                    t.textContent = msg; t.className = "show";
-                    setTimeout(() => t.className = t.className.replace("show", ""), 3000);
-                };
-
-                window.updateCharCount = (input, max) => {
-                    const count = input.value.length;
-                    const el = input.nextElementSibling;
-                    if(el) el.textContent = `${count}/${max}`;
-                };
-
-                window.openModal = (id) => {
-                    const el = document.getElementById(id);
-                    el.classList.add('active');
-                    document.body.style.overflow = 'hidden';
-                };
-                
-                window.closeModal = (id) => {
-                    const el = document.getElementById(id);
-                    el.classList.remove('active');
-                    document.body.style.overflow = 'auto';
-                };
-
-                // --- AUTHENTICATION ---
-                auth.onAuthStateChanged((user) => {
-                    currentUser = user;
-                    const mobileText = document.getElementById('mobile-auth-text');
-                    const desktopText = document.getElementById('auth-btn-text');
-                    const desktopBtn = document.getElementById('desktop-auth-btn');
-
-                    if (user) {
-                        if(mobileText) mobileText.textContent = "Buka Dashboard";
-                        if(desktopText) desktopText.textContent = "Dashboard";
-                        if(desktopBtn) desktopBtn.classList.add('btn-outline');
-                        loadAdminData();
-                    } else {
-                        if(mobileText) mobileText.textContent = "Login Admin";
-                        if(desktopText) desktopText.textContent = "Login";
-                        if(desktopBtn) desktopBtn.classList.remove('btn-outline');
-                        const adminPanel = document.getElementById('admin-panel');
-                        if(adminPanel) adminPanel.style.display = 'none';
-                    }
+            // --- UTILITIES ---
+            const escapeHtml = (text) => {
+                if (!text) return "";
+                return text.toString().replace(/[&<>"']/g, function(m) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
                 });
+            };
 
-                window.handleAuth = () => {
-                    if (currentUser) window.openPanel();
-                    else window.openModal('login-modal');
-                };
+            window.showToast = (msg) => {
+                const t = document.getElementById("toast");
+                t.textContent = msg; t.className = "show";
+                setTimeout(() => t.className = t.className.replace("show", ""), 3000);
+            };
 
-                window.performLogin = () => {
-                    const email = document.getElementById('login-email').value;
-                    const pass = document.getElementById('login-pass').value;
-                    if(!email || !pass) return showToast("Isi semua data!");
+            window.updateCharCount = (input, max) => {
+                const count = input.value.length;
+                const el = input.nextElementSibling;
+                if(el) el.textContent = `${count}/${max}`;
+            };
 
-                    showToast("Memproses...");
-                    auth.signInWithEmailAndPassword(email, pass)
-                        .then(() => {
-                            closeModal('login-modal');
-                            showToast("Selamat datang, Admin!");
-                            window.openPanel();
-                        })
-                        .catch(err => showToast("Gagal: " + err.message));
-                };
+            window.openModal = (id) => {
+                document.getElementById(id).classList.add('active');
+                document.body.style.overflow = 'hidden';
+            };
+            
+            window.closeModal = (id) => {
+                document.getElementById(id).classList.remove('active');
+                document.body.style.overflow = 'auto';
+            };
 
-                window.logoutSession = () => {
-                    auth.signOut().then(() => {
-                        showToast("Berhasil Logout");
-                        window.closePanel();
+            // --- AUTHENTICATION ---
+            auth.onAuthStateChanged((user) => {
+                currentUser = user;
+                const mobileText = document.getElementById('mobile-auth-text');
+                const desktopText = document.getElementById('auth-btn-text');
+                const desktopBtn = document.getElementById('desktop-auth-btn');
+
+                if (user) {
+                    if(mobileText) mobileText.textContent = "Buka Dashboard";
+                    if(desktopText) desktopText.textContent = "Dashboard";
+                    if(desktopBtn) desktopBtn.classList.add('btn-outline');
+                    loadAdminData(); // Load data admin hanya jika login
+                } else {
+                    if(mobileText) mobileText.textContent = "Login Admin";
+                    if(desktopText) desktopText.textContent = "Login";
+                    if(desktopBtn) desktopBtn.classList.remove('btn-outline');
+                    const adminPanel = document.getElementById('admin-panel');
+                    if(adminPanel) adminPanel.style.display = 'none';
+                }
+            });
+
+            window.handleAuth = () => {
+                if (currentUser) window.openPanel();
+                else window.openModal('login-modal');
+            };
+
+            window.performLogin = () => {
+                const email = document.getElementById('login-email').value;
+                const pass = document.getElementById('login-pass').value;
+                if(!email || !pass) return showToast("Isi semua data!");
+
+                showToast("Memproses...");
+                auth.signInWithEmailAndPassword(email, pass)
+                    .then(() => {
+                        closeModal('login-modal');
+                        showToast("Selamat datang, Admin!");
+                        window.openPanel();
+                    })
+                    .catch(err => showToast("Gagal: " + err.message));
+            };
+
+            window.logoutSession = () => {
+                auth.signOut().then(() => {
+                    showToast("Berhasil Logout");
+                    window.closePanel();
+                });
+            };
+
+            // --- ADMIN PANEL LOGIC ---
+            window.openPanel = () => {
+                document.getElementById('admin-panel').style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                const nav = document.getElementById('nav-links');
+                if(nav) nav.classList.remove('active');
+            };
+            window.closePanel = () => {
+                document.getElementById('admin-panel').style.display = 'none';
+                document.body.style.overflow = 'auto';
+                window.resetForm();
+            };
+
+            // --- IMAGE CROPPER ---
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+            
+            dropZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+            
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
+            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = 'var(--border)';
+                handleFile(e.dataTransfer.files[0]);
+            });
+
+            function handleFile(file) {
+                if (!file || !file.type.startsWith('image/')) return showToast("Harus file gambar!");
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('image-to-crop').src = e.target.result;
+                    openModal('crop-modal');
+                    if(cropper) cropper.destroy();
+                    cropper = new Cropper(document.getElementById('image-to-crop'), {
+                        aspectRatio: 1, viewMode: 1, autoCropArea: 1
                     });
                 };
+                reader.readAsDataURL(file);
+            }
 
-                // --- ADMIN PANEL LOGIC ---
-                window.openPanel = () => {
-                    document.getElementById('admin-panel').style.display = 'block';
-                    document.body.style.overflow = 'hidden';
-                    const nav = document.getElementById('nav-links');
-                    if(nav) nav.classList.remove('active');
+            window.performCrop = () => {
+                if(!cropper) return;
+                const canvas = cropper.getCroppedCanvas({ width: 800, height: 800 });
+                const base64 = canvas.toDataURL('image/jpeg', 0.7); 
+                
+                document.getElementById('img-preview').src = base64;
+                document.getElementById('img-preview').style.display = 'block';
+                document.querySelector('.drop-zone i').style.display = 'none';
+                document.querySelector('.drop-zone p').style.display = 'none';
+                document.getElementById('drop-zone').classList.add('has-image');
+                document.getElementById('final-base64').value = base64;
+                
+                closeModal('crop-modal');
+                cropper.destroy(); cropper = null;
+            };
+
+            // --- CRUD OPERATIONS (FIXED) ---
+            window.savePortfolio = () => {
+                if(!currentUser) return showToast("Sesi habis, silakan login ulang.");
+                
+                const title = document.getElementById('port-title').value.trim();
+                const desc = document.getElementById('port-desc').value.trim();
+                const link = document.getElementById('port-link').value.trim();
+                const img = document.getElementById('final-base64').value;
+                const btn = document.getElementById('btn-save');
+
+                if(!title || !img) return showToast("Judul dan Foto wajib!");
+
+                btn.disabled = true; btn.textContent = "Menyimpan...";
+                
+                const data = {
+                    title, desc, link, img,
+                    date: document.getElementById('port-date-hidden').value || new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})
                 };
-                window.closePanel = () => {
-                    document.getElementById('admin-panel').style.display = 'none';
-                    document.body.style.overflow = 'auto';
+
+                const ref = currentEditKey ? db.ref('portfolio/' + currentEditKey) : db.ref('portfolio').push();
+                const promise = currentEditKey ? ref.update(data) : ref.set(data);
+
+                promise.then(() => {
+                    showToast("Berhasil disimpan!");
                     window.resetForm();
-                };
-
-                // --- IMAGE CROPPER ---
-                const dropZone = document.getElementById('drop-zone');
-                const fileInput = document.getElementById('file-input');
-                
-                dropZone.addEventListener('click', () => fileInput.click());
-                // Keyboard accessibility for dropzone
-                dropZone.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') fileInput.click();
+                    btn.disabled = false; btn.textContent = "Posting";
+                }).catch(e => {
+                    console.error(e);
+                    showToast("Error: " + e.message);
+                    btn.disabled = false; btn.textContent = "Posting";
                 });
+            };
 
-                fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+            window.editPortfolio = (key) => {
+                // Ambil data dari variabel global berdasarkan key
+                const item = portfolioData[key];
                 
-                dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
-                dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; });
-                dropZone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    dropZone.style.borderColor = 'var(--border)';
-                    handleFile(e.dataTransfer.files[0]);
-                });
+                if (!item) return showToast("Data tidak ditemukan error.");
 
-                function handleFile(file) {
-                    if (!file || !file.type.startsWith('image/')) return showToast("Harus file gambar!");
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        document.getElementById('image-to-crop').src = e.target.result;
-                        openModal('crop-modal');
-                        if(cropper) cropper.destroy();
-                        cropper = new Cropper(document.getElementById('image-to-crop'), {
-                            aspectRatio: 1, viewMode: 1, autoCropArea: 1
-                        });
-                    };
-                    reader.readAsDataURL(file);
-                }
+                currentEditKey = key;
+                
+                // Isi form dengan data yang bersih (aman dari error karakter aneh)
+                document.getElementById('port-title').value = item.title || '';
+                document.getElementById('port-desc').value = item.desc || '';
+                document.getElementById('port-link').value = item.link || '';
+                document.getElementById('final-base64').value = item.img || '';
+                document.getElementById('port-date-hidden').value = item.date || '';
 
-                window.performCrop = () => {
-                    if(!cropper) return;
-                    const canvas = cropper.getCroppedCanvas({ width: 800, height: 800 });
-                    const base64 = canvas.toDataURL('image/jpeg', 0.7); 
-                    
-                    document.getElementById('img-preview').src = base64;
-                    document.getElementById('img-preview').style.display = 'block';
-                    document.querySelector('.drop-zone i').style.display = 'none';
-                    document.querySelector('.drop-zone p').style.display = 'none';
-                    document.getElementById('drop-zone').classList.add('has-image');
-                    document.getElementById('final-base64').value = base64;
-                    
-                    closeModal('crop-modal');
-                    cropper.destroy(); cropper = null;
-                };
+                // Tampilkan preview foto
+                const preview = document.getElementById('img-preview');
+                preview.src = item.img; 
+                preview.style.display = 'block';
+                document.querySelector('.drop-zone i').style.display = 'none';
+                document.querySelector('.drop-zone p').style.display = 'none';
+                
+                // Ubah tampilan form jadi Mode Edit
+                document.getElementById('form-title').innerHTML = '<i class="fas fa-edit"></i> Edit Karya';
+                document.getElementById('btn-save').textContent = 'Simpan Perubahan';
+                document.getElementById('btn-cancel').style.display = 'inline-block';
+                
+                // Scroll ke atas agar form terlihat
+                document.getElementById('admin-panel').scrollTo({top: 0, behavior: 'smooth'});
+            };
 
-                // --- CRUD OPERATIONS ---
-                window.savePortfolio = () => {
-                    if(!currentUser) return showToast("Sesi habis.");
-                    
-                    const title = document.getElementById('port-title').value.trim();
-                    const desc = document.getElementById('port-desc').value.trim();
-                    const link = document.getElementById('port-link').value.trim();
-                    const img = document.getElementById('final-base64').value;
-                    const btn = document.getElementById('btn-save');
+            window.confirmDelete = (key, type) => {
+                deleteTarget = { key, type };
+                openModal('delete-modal');
+            };
 
-                    if(!title || !img) return showToast("Judul dan Foto wajib!");
+            window.performDelete = () => {
+                if(!currentUser || !deleteTarget.key) return;
+                const path = deleteTarget.type === 'msg' ? 'messages' : 'portfolio';
+                db.ref(path).child(deleteTarget.key).remove()
+                    .then(() => showToast("Data dihapus"))
+                    .catch(e => showToast(e.message));
+                closeModal('delete-modal');
+            };
 
-                    btn.disabled = true; btn.textContent = "Menyimpan...";
-                    
-                    const data = {
-                        title, desc, link, img,
-                        date: document.getElementById('port-date-hidden').value || new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})
-                    };
+            window.resetForm = () => {
+                currentEditKey = null;
+                document.getElementById('port-title').value = '';
+                document.getElementById('port-desc').value = '';
+                document.getElementById('port-link').value = '';
+                document.getElementById('final-base64').value = '';
+                document.getElementById('port-date-hidden').value = '';
+                
+                document.getElementById('img-preview').style.display = 'none';
+                document.querySelector('.drop-zone i').style.display = 'block';
+                document.querySelector('.drop-zone p').style.display = 'block';
+                
+                document.getElementById('btn-save').textContent = 'Posting';
+                document.getElementById('btn-save').disabled = false;
+                document.getElementById('btn-cancel').style.display = 'none';
+                document.getElementById('form-title').innerHTML = '<i class="fas fa-plus-circle"></i> Tambah Karya';
+            };
 
-                    const promise = currentEditKey 
-                        ? db.ref('portfolio/' + currentEditKey).update(data)
-                        : db.ref('portfolio').push(data);
-
-                    promise.then(() => {
-                        showToast("Berhasil disimpan!");
-                        window.resetForm();
-                    }).catch(e => {
-                        showToast("Error: " + e.message);
-                        btn.disabled = false; btn.textContent = "Posting";
+            // --- PUBLIC DATA LOAD ---
+            db.ref('portfolio').on('value', snap => {
+                const grid = document.getElementById('portfolio-grid');
+                const data = snap.val();
+                grid.innerHTML = '';
+                
+                if(data) {
+                    Object.entries(data).reverse().forEach(([key, item]) => {
+                        const article = document.createElement('article');
+                        article.className = 'portfolio-item';
+                        article.onclick = () => openDetail(item);
+                        
+                        article.innerHTML = `
+                            <div class="portfolio-img-wrapper">
+                                <img src="${item.img}" class="portfolio-img" alt="${escapeHtml(item.title)}" loading="lazy">
+                            </div>
+                            <div class="portfolio-info">
+                                <span class="portfolio-date">${escapeHtml(item.date)}</span>
+                                <h3>${escapeHtml(item.title)}</h3>
+                                <p>${escapeHtml(item.desc)}</p>
+                                <span class="visit-link">Detail <i class="fas fa-arrow-right"></i></span>
+                            </div>
+                        `;
+                        grid.appendChild(article);
                     });
-                };
+                } else {
+                    grid.innerHTML = '<div class="text-center" style="grid-column:1/-1; padding:20px;">Belum ada karya yang ditampilkan.</div>';
+                }
+            });
 
-                window.editPortfolio = (key, title, desc, link, img, date) => {
-                    currentEditKey = key;
-                    document.getElementById('port-title').value = title;
-                    document.getElementById('port-desc').value = desc;
-                    document.getElementById('port-link').value = link;
-                    document.getElementById('final-base64').value = img;
-                    document.getElementById('port-date-hidden').value = date;
+            function openDetail(item) {
+                document.getElementById('detail-img').src = item.img;
+                document.getElementById('detail-title').textContent = item.title;
+                document.getElementById('detail-desc').textContent = item.desc;
+                document.getElementById('detail-date').textContent = item.date;
+                
+                const btn = document.getElementById('detail-link');
+                if(item.link && item.link.startsWith('http')) {
+                    btn.href = item.link;
+                    btn.style.display = 'inline-flex';
+                } else {
+                    btn.style.display = 'none';
+                }
+                openModal('detail-modal');
+            }
 
-                    const preview = document.getElementById('img-preview');
-                    preview.src = img; preview.style.display = 'block';
-                    document.querySelector('.drop-zone i').style.display = 'none';
-                    document.querySelector('.drop-zone p').style.display = 'none';
-                    
-                    document.getElementById('form-title').innerHTML = '<i class="fas fa-edit"></i> Edit Karya';
-                    document.getElementById('btn-save').textContent = 'Simpan Perubahan';
-                    document.getElementById('btn-cancel').style.display = 'inline-block';
-                    
-                    document.getElementById('admin-panel').scrollTo({top: 0, behavior: 'smooth'});
-                };
-
-                window.confirmDelete = (key, type) => {
-                    deleteTarget = { key, type };
-                    openModal('delete-modal');
-                };
-
-                window.performDelete = () => {
-                    if(!currentUser || !deleteTarget.key) return;
-                    const path = deleteTarget.type === 'msg' ? 'messages' : 'portfolio';
-                    db.ref(path).child(deleteTarget.key).remove()
-                        .then(() => showToast("Data dihapus"))
-                        .catch(e => showToast(e.message));
-                    closeModal('delete-modal');
-                };
-
-                window.resetForm = () => {
-                    currentEditKey = null;
-                    document.getElementById('port-title').value = '';
-                    document.getElementById('port-desc').value = '';
-                    document.getElementById('port-link').value = '';
-                    document.getElementById('final-base64').value = '';
-                    document.getElementById('port-date-hidden').value = '';
-                    
-                    document.getElementById('img-preview').style.display = 'none';
-                    document.querySelector('.drop-zone i').style.display = 'block';
-                    document.querySelector('.drop-zone p').style.display = 'block';
-                    
-                    document.getElementById('btn-save').textContent = 'Posting';
-                    document.getElementById('btn-save').disabled = false;
-                    document.getElementById('btn-cancel').style.display = 'none';
-                    document.getElementById('form-title').innerHTML = '<i class="fas fa-plus-circle"></i> Tambah Karya';
-                };
-
-                // --- PUBLIC DATA LOAD ---
+            // --- ADMIN DATA LOAD ---
+            function loadAdminData() {
                 db.ref('portfolio').on('value', snap => {
-                    const grid = document.getElementById('portfolio-grid');
+                    const list = document.getElementById('admin-port-list');
                     const data = snap.val();
-                    grid.innerHTML = '';
+                    let html = '';
                     
+                    // Reset data penampung
+                    portfolioData = {}; 
+
                     if(data) {
                         Object.entries(data).reverse().forEach(([key, item]) => {
-                            const article = document.createElement('article');
-                            article.className = 'portfolio-item';
-                            // Accessibility for click
-                            article.setAttribute('role', 'button');
-                            article.setAttribute('tabindex', '0');
-                            article.onclick = () => openDetail(item);
-                            article.onkeydown = (e) => { if(e.key === 'Enter') openDetail(item) };
-                            
-                            article.innerHTML = `
-                                <div class="portfolio-img-wrapper">
-                                    <img src="${item.img}" class="portfolio-img" alt="${escapeHtml(item.title)}" loading="lazy" width="280" height="280">
+                            // Simpan data asli ke variabel global agar aman dari error tanda kutip/enter
+                            portfolioData[key] = item; 
+
+                            html += `
+                            <div class="admin-port-item">
+                                <img src="${item.img}" class="admin-port-img" alt="Thumbnail">
+                                <div style="font-weight:700; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${escapeHtml(item.title)}</div>
+                                <div class="admin-actions">
+                                    <button onclick="editPortfolio('${key}')" class="btn btn-sm" style="background:var(--primary); color:black;">Edit</button>
+                                    <button onclick="confirmDelete('${key}', 'port')" class="btn btn-sm" style="background:var(--secondary); color:white;">Hapus</button>
                                 </div>
-                                <div class="portfolio-info">
-                                    <span class="portfolio-date">${escapeHtml(item.date)}</span>
-                                    <h3>${escapeHtml(item.title)}</h3>
-                                    <p>${escapeHtml(item.desc)}</p>
-                                    <span class="visit-link">Detail <i class="fas fa-arrow-right"></i></span>
-                                </div>
-                            `;
-                            grid.appendChild(article);
+                            </div>`;
                         });
-                    } else {
-                        grid.innerHTML = '<div class="text-center" style="grid-column:1/-1; padding:20px;">Belum ada karya yang ditampilkan.</div>';
-                    }
+                        list.innerHTML = html;
+                    } else list.innerHTML = 'Data kosong.';
                 });
 
-                function openDetail(item) {
-                    document.getElementById('detail-img').src = item.img;
-                    document.getElementById('detail-title').textContent = item.title;
-                    document.getElementById('detail-desc').textContent = item.desc;
-                    document.getElementById('detail-date').textContent = item.date;
-                    
-                    const btn = document.getElementById('detail-link');
-                    if(item.link && item.link.startsWith('http')) {
-                        btn.href = item.link;
-                        btn.style.display = 'inline-flex';
-                    } else {
-                        btn.style.display = 'none';
-                    }
-                    openModal('detail-modal');
-                }
-
-                // --- ADMIN DATA LOAD ---
-                function loadAdminData() {
-                    db.ref('portfolio').on('value', snap => {
-                        const list = document.getElementById('admin-port-list');
-                        const data = snap.val();
-                        let html = '';
-                        if(data) {
-                            Object.entries(data).reverse().forEach(([key, item]) => {
-                                const sTitle = escapeHtml(item.title).replace(/'/g, "\\'");
-                                const sDesc = escapeHtml(item.desc).replace(/'/g, "\\'");
-                                const sLink = escapeHtml(item.link).replace(/'/g, "\\'");
-                                const sDate = escapeHtml(item.date).replace(/'/g, "\\'");
-                                
-                                html += `
-                                <div class="admin-port-item">
-                                    <img src="${item.img}" class="admin-port-img" alt="Thumbnail">
-                                    <div style="font-weight:700; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${escapeHtml(item.title)}</div>
-                                    <div class="admin-actions">
-                                        <button onclick="editPortfolio('${key}', '${sTitle}', '${sDesc}', '${sLink}', '${item.img}', '${sDate}')" class="btn btn-sm" style="background:var(--primary); color:black;">Edit</button>
-                                        <button onclick="confirmDelete('${key}', 'port')" class="btn btn-sm" style="background:var(--secondary); color:white;">Hapus</button>
-                                    </div>
-                                </div>`;
-                            });
-                            list.innerHTML = html;
-                        } else list.innerHTML = 'Data kosong.';
-                    });
-
-                    db.ref('messages').on('value', snap => {
-                        const list = document.getElementById('message-list');
-                        const data = snap.val();
-                        let html = '';
-                        if(data) {
-                            Object.entries(data).reverse().forEach(([key, msg]) => {
-                                html += `
-                                <div style="background:var(--bg-body); padding:15px; border-radius:10px; border:1px solid var(--border); margin-bottom:10px; position:relative;">
-                                    <button onclick="confirmDelete('${key}', 'msg')" style="position:absolute; top:10px; right:10px; background:none; border:none; color:var(--secondary); cursor:pointer;" aria-label="Hapus Pesan"><i class="fas fa-trash"></i></button>
-                                    <strong style="color:var(--primary);">${escapeHtml(msg.name)}</strong>
-                                    <p style="font-size:0.9rem; margin-top:5px;">${escapeHtml(msg.message)}</p>
-                                    <small style="color:var(--text-muted); font-size:0.7rem;">${msg.date}</small>
-                                </div>`;
-                            });
-                            list.innerHTML = html;
-                        } else list.innerHTML = 'Tidak ada pesan.';
-                    });
-                }
-
-                // --- PUBLIC MESSAGING ---
-                window.sendMessage = () => {
-                    const name = document.getElementById('contact-name').value.trim();
-                    const msg = document.getElementById('contact-msg').value.trim();
-                    if(!name || !msg) return showToast("Nama & Pesan wajib diisi!");
-
-                    const btn = document.getElementById('btn-send');
-                    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengirim...';
-
-                    const now = new Date();
-                    db.ref('messages').push({
-                        name, message: msg,
-                        date: now.toLocaleDateString() + ' ' + now.toLocaleTimeString()
-                    }).then(() => {
-                        showToast("Pesan Terkirim!");
-                        document.getElementById('contact-name').value = '';
-                        document.getElementById('contact-msg').value = '';
-                        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Kirim Pesan';
-                    }).catch(() => {
-                        showToast("Gagal mengirim pesan.");
-                        btn.disabled = false;
-                    });
-                };
+                db.ref('messages').on('value', snap => {
+                    const list = document.getElementById('message-list');
+                    const data = snap.val();
+                    let html = '';
+                    if(data) {
+                        Object.entries(data).reverse().forEach(([key, msg]) => {
+                            html += `
+                            <div style="background:var(--bg-body); padding:15px; border-radius:10px; border:1px solid var(--border); margin-bottom:10px; position:relative;">
+                                <button onclick="confirmDelete('${key}', 'msg')" style="position:absolute; top:10px; right:10px; background:none; border:none; color:var(--secondary); cursor:pointer;" aria-label="Hapus Pesan"><i class="fas fa-trash"></i></button>
+                                <strong style="color:var(--primary);">${escapeHtml(msg.name)}</strong>
+                                <p style="font-size:0.9rem; margin-top:5px;">${escapeHtml(msg.message)}</p>
+                                <small style="color:var(--text-muted); font-size:0.7rem;">${msg.date}</small>
+                            </div>`;
+                        });
+                        list.innerHTML = html;
+                    } else list.innerHTML = 'Tidak ada pesan.';
+                });
             }
+
+            // --- PUBLIC MESSAGING (FIXED) ---
+            window.sendMessage = () => {
+                const name = document.getElementById('contact-name').value.trim();
+                const msg = document.getElementById('contact-msg').value.trim();
+                if(!name || !msg) return showToast("Nama & Pesan wajib diisi!");
+
+                const btn = document.getElementById('btn-send');
+                btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengirim...';
+
+                const now = new Date();
+                db.ref('messages').push({
+                    name, message: msg,
+                    date: now.toLocaleDateString() + ' ' + now.toLocaleTimeString()
+                }).then(() => {
+                    showToast("Pesan Terkirim!");
+                    document.getElementById('contact-name').value = '';
+                    document.getElementById('contact-msg').value = '';
+                    btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Kirim Pesan';
+                }).catch((error) => {
+                    console.error("Error sending message:", error);
+                    showToast("Gagal mengirim: " + error.message);
+                    btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Kirim Pesan';
+                });
+            };
         });
 
-        // --- UI EFFECT LOGIC (Outside Firebase scope for immediate load) ---
+        // --- UI EFFECT LOGIC ---
         window.addEventListener('scroll', () => {
             const winScroll = document.documentElement.scrollTop;
             const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
